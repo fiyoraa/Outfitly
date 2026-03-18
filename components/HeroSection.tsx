@@ -47,7 +47,7 @@ export default function HeroSection() {
         <div className="relative hidden lg:block">
           <div className="rounded-3xl border border-[#E8E4E0] bg-white p-6 shadow-xl">
             <div className="mb-5 flex items-center justify-between">
-              <p className="text-sm font-medium text-[#1A1A1A]">Today's Outfit Suggestion</p>
+              <p className="text-sm font-medium text-[#1A1A1A]">Today&apos;s Outfit Suggestion</p>
               <span className="rounded-full bg-[#F5F3F0] px-3 py-1 text-xs text-[#D4537E] font-medium">AI Match 95%</span>
             </div>
 

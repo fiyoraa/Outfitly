@@ -85,7 +85,7 @@ export default function GalleryPage() {
             >
               <div className="relative overflow-hidden bg-[#F5F3F0]">
                 <div className="grid grid-cols-2 gap-1">
-                  {entry.data.images.slice(0, 4).map((imageUrl, idx) => (
+                  {entry.data.images.slice(0, 4).map((imageUrl) => (
                     <img
                       key={imageUrl}
                       src={imageUrl}
@@ -134,59 +134,6 @@ export default function GalleryPage() {
                   type="button"
                   onClick={() => handleDelete(entry.id)}
                   className="w-full rounded-full border border-[#D4537E] px-4 py-2.5 text-sm font-medium text-[#D4537E] transition-all duration-200 opacity-0 group-hover:opacity-100 hover:bg-[#F5F3F0]"
-                >
-                  Hapus
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-              <div className="mb-4 grid grid-cols-2 gap-2">
-                {entry.data.images.map((imageUrl) => (
-                  <img
-                    key={imageUrl}
-                    src={imageUrl}
-                    alt="Saved outfit"
-                    className="aspect-[3/4] w-full rounded-lg object-cover"
-                    loading="lazy"
-                  />
-                ))}
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-xs text-[#8a7b80]">
-                  {entry.data.timestamp
-                    ? new Date(entry.data.timestamp).toLocaleString("id-ID")
-                    : "Waktu simpan tidak tersedia"}
-                </p>
-                <div>
-                  <p className="text-sm font-semibold text-[#2f2a2b]">Outfit Combo</p>
-                  <p className="text-sm text-[#534a4d]">{entry.data.outfit}</p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold text-[#2f2a2b]">Items</p>
-                  <ul className="list-disc space-y-1 pl-5 text-sm text-[#534a4d]">
-                    {entry.data.items.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold text-[#2f2a2b]">Style Tips</p>
-                  <p className="whitespace-pre-wrap text-sm text-[#534a4d]">{entry.data.tips}</p>
-                </div>
-              </div>
-
-              <div className="mt-5">
-                <button
-                  type="button"
-                  onClick={() => handleDelete(entry.id)}
-                  className="rounded-full border border-[#d4537e] px-4 py-2 text-sm font-medium text-[#8a2f4f]"
                 >
                   Hapus
                 </button>
