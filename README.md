@@ -93,7 +93,7 @@ npm run lint
 ## Security Notes
 
 - API key disimpan di environment variable server-side.
-- Jika key pernah terekspos, segera rotate/regenerate di dashboard provider.
+- Jika key pernah terekspos, segera rotate/regenerate di dashboard.
 
 ## Author
 
