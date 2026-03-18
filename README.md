@@ -99,4 +99,4 @@ npm run lint
 
 Outfitly by Fiyoraa
 
-- GitHub: https://github.com/fiyoraa/Oufitly
+- GitHub: https://github.com/fiyoraa/Outfitly
