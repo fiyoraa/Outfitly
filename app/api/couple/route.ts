@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+export const maxDuration = 60;
+
 type PersonInput = {
   gender: string;
   mood: string[];
@@ -45,6 +47,8 @@ type UnsplashResponse = {
 };
 
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_TIMEOUT_MS = 20000;
+const UNSPLASH_TIMEOUT_MS = 8000;
 
 const hasValues = (value: unknown): value is string[] => {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
@@ -87,11 +91,17 @@ const fetchUnsplashImages = async (searchKeyword: string): Promise<string[]> => 
   const query = encodeURIComponent(searchKeyword);
   const url = `https://api.unsplash.com/search/photos?query=${query}&per_page=4&orientation=portrait`;
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), UNSPLASH_TIMEOUT_MS);
+
   const response = await fetch(url, {
     headers: {
       Authorization: `Client-ID ${accessKey}`,
     },
     cache: "no-store",
+    signal: controller.signal,
+  }).finally(() => {
+    clearTimeout(timeout);
   });
 
   if (!response.ok) {
@@ -155,6 +165,9 @@ export async function POST(request: Request) {
       `Person 2 Style: ${toLabel(payload.person2.style)}`,
     ].join("\n");
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), GROQ_TIMEOUT_MS);
+
     const groqResponse = await fetch(GROQ_ENDPOINT, {
       method: "POST",
       headers: {
@@ -171,6 +184,9 @@ export async function POST(request: Request) {
         ],
         temperature: 0.7,
       }),
+      signal: controller.signal,
+    }).finally(() => {
+      clearTimeout(timeout);
     });
 
     const data = (await groqResponse.json()) as GroqResponse;
@@ -206,7 +222,12 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Terjadi kesalahan saat memproses Couple Mode.";
+    const message =
+      error instanceof Error && error.name === "AbortError"
+        ? "Permintaan ke layanan AI melebihi batas waktu. Coba lagi beberapa saat."
+        : error instanceof Error
+          ? error.message
+          : "Terjadi kesalahan saat memproses Couple Mode.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

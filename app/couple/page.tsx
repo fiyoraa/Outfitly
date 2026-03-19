@@ -28,6 +28,14 @@ type CoupleApiResponse = {
   error?: string;
 };
 
+const parseApiResponse = (raw: string): CoupleApiResponse => {
+  try {
+    return JSON.parse(raw) as CoupleApiResponse;
+  } catch {
+    return { error: "Respons server tidak valid (bukan JSON)." };
+  }
+};
+
 const moodOptions = ["Kalem", "Percaya diri", "Playful", "Bold", "Clean", "Moody", "Galau"];
 const occasionOptions = ["Hangout", "Date malam", "Ngampus", "Kantor", "Wedding", "Staycation", "Kondangan", "Nongkrong cafe"];
 const weatherOptions = ["Panas", "Hujan", "Sejuk"];
@@ -67,10 +75,12 @@ export default function CouplePage() {
         body: JSON.stringify({ person1, person2 }),
       });
 
-      const data = (await response.json()) as CoupleApiResponse;
+      const raw = await response.text();
+      const data = parseApiResponse(raw);
 
       if (!response.ok) {
-        throw new Error(data.error || "Gagal mencocokkan outfit.");
+        const fallback = raw.slice(0, 120).replace(/\s+/g, " ").trim();
+        throw new Error(data.error || `Gagal mencocokkan outfit (${response.status}). ${fallback}`);
       }
 
       setResult1(data.person1 ? JSON.stringify(data.person1) : "");
