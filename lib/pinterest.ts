@@ -6,6 +6,23 @@ const PINTEREST_ENDPOINTS = [
   "https://api.pinterest.com/v5/search/pins",
 ];
 
+export type PinterestAttempt = {
+  endpoint: string;
+  query: string;
+  status: number | null;
+  ok: boolean;
+  imageCount: number;
+  error?: string;
+};
+
+export type PinterestFetchResult = {
+  images: string[];
+  debug: {
+    tokenConfigured: boolean;
+    attempts: PinterestAttempt[];
+  };
+};
+
 const clean = (value: string) => value.trim().replace(/\s+/g, " ");
 
 const buildQueryCandidates = (searchKeyword: string): string[] => {
@@ -82,11 +99,19 @@ const getItems = (payload: unknown): unknown[] => {
   return [];
 };
 
+const truncate = (value: string, length = 220) => {
+  if (value.length <= length) {
+    return value;
+  }
+
+  return `${value.slice(0, length)}...`;
+};
+
 const fetchFromEndpoint = async (
   endpoint: string,
   query: string,
   token: string,
-): Promise<string[]> => {
+): Promise<{ images: string[]; attempt: PinterestAttempt }> => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), PINTEREST_TIMEOUT_MS);
   const params = new URLSearchParams({
@@ -96,37 +121,82 @@ const fetchFromEndpoint = async (
 
   const url = `${endpoint}?${params.toString()}`;
 
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-    cache: "no-store",
-    signal: controller.signal,
-  }).finally(() => {
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const responseText = truncate(await response.text());
+
+      return {
+        images: [],
+        attempt: {
+          endpoint,
+          query,
+          status: response.status,
+          ok: false,
+          imageCount: 0,
+          error: `HTTP ${response.status}: ${responseText}`,
+        },
+      };
+    }
+
+    const payload = (await response.json()) as unknown;
+    const images = getItems(payload)
+      .map(extractImageUrl)
+      .filter((imageUrl): imageUrl is string => Boolean(imageUrl));
+
+    return {
+      images,
+      attempt: {
+        endpoint,
+        query,
+        status: response.status,
+        ok: true,
+        imageCount: images.length,
+      },
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown Pinterest fetch error";
+
+    return {
+      images: [],
+      attempt: {
+        endpoint,
+        query,
+        status: null,
+        ok: false,
+        imageCount: 0,
+        error: message,
+      },
+    };
+  } finally {
     clearTimeout(timeout);
-  });
-
-  if (!response.ok) {
-    return [];
   }
-
-  const payload = (await response.json()) as unknown;
-
-  return getItems(payload)
-    .map(extractImageUrl)
-    .filter((imageUrl): imageUrl is string => Boolean(imageUrl));
 };
 
 export const fetchPinterestImages = async (
   searchKeyword: string,
   maxImages = 4,
-): Promise<string[]> => {
+): Promise<PinterestFetchResult> => {
   const token = process.env.PINTEREST_ACCESS_TOKEN;
+  const attempts: PinterestAttempt[] = [];
 
   if (!token) {
-    return [];
+    return {
+      images: [],
+      debug: {
+        tokenConfigured: false,
+        attempts,
+      },
+    };
   }
 
   const imageSet = new Set<string>();
@@ -134,17 +204,37 @@ export const fetchPinterestImages = async (
 
   for (const query of queries) {
     for (const endpoint of PINTEREST_ENDPOINTS) {
-      const images = await fetchFromEndpoint(endpoint, query, token);
+      const { images, attempt } = await fetchFromEndpoint(endpoint, query, token);
+      attempts.push(attempt);
 
       for (const image of images) {
         imageSet.add(image);
       }
 
       if (imageSet.size >= maxImages) {
-        return Array.from(imageSet).slice(0, maxImages);
+        return {
+          images: Array.from(imageSet).slice(0, maxImages),
+          debug: {
+            tokenConfigured: true,
+            attempts,
+          },
+        };
       }
     }
   }
 
-  return Array.from(imageSet).slice(0, maxImages);
+  if (imageSet.size === 0) {
+    console.error("[Pinterest] No images returned", {
+      searchKeyword,
+      attempts,
+    });
+  }
+
+  return {
+    images: Array.from(imageSet).slice(0, maxImages),
+    debug: {
+      tokenConfigured: true,
+      attempts,
+    },
+  };
 };

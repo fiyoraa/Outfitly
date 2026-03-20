@@ -89,6 +89,7 @@ const resolvePersonKeyword = (person: PersonResult, fallback: PersonInput): stri
 
 export async function POST(request: Request) {
   try {
+    const shouldIncludePinterestDebug = request.headers.get("x-debug-pinterest") === "1";
     const body = (await request.json()) as Partial<CouplePayload>;
 
     const payload: CouplePayload = {
@@ -176,10 +177,12 @@ export async function POST(request: Request) {
     const parsed = parseCoupleJson(resultText);
     const person1Keyword = resolvePersonKeyword(parsed.person1, payload.person1);
     const person2Keyword = resolvePersonKeyword(parsed.person2, payload.person2);
-    const [images1, images2] = await Promise.all([
+    const [pinterest1, pinterest2] = await Promise.all([
       fetchPinterestImages(person1Keyword),
       fetchPinterestImages(person2Keyword),
     ]);
+    const images1 = pinterest1.images;
+    const images2 = pinterest2.images;
 
     return NextResponse.json({
       person1: {
@@ -196,6 +199,14 @@ export async function POST(request: Request) {
         searchKeyword: person2Keyword,
         images: images2,
       },
+      ...(shouldIncludePinterestDebug
+        ? {
+            pinterestDebug: {
+              person1: pinterest1.debug,
+              person2: pinterest2.debug,
+            },
+          }
+        : {}),
     });
   } catch (error) {
     const message =

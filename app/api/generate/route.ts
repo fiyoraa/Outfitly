@@ -49,6 +49,7 @@ const resolveSearchKeyword = (parsed: OutfitResult, payload: OutfitInput): strin
 
 export async function POST(request: Request) {
   try {
+    const shouldIncludePinterestDebug = request.headers.get("x-debug-pinterest") === "1";
     const body = (await request.json()) as Partial<OutfitInput>;
 
     const payload: OutfitInput = {
@@ -63,7 +64,8 @@ export async function POST(request: Request) {
     const result = await generateOutfit(payload);
     const parsed = parseOutfitJson(result);
     const effectiveSearchKeyword = resolveSearchKeyword(parsed, payload);
-    const images = await fetchPinterestImages(effectiveSearchKeyword);
+    const pinterest = await fetchPinterestImages(effectiveSearchKeyword);
+    const images = pinterest.images;
 
     return NextResponse.json({
       outfit: parsed.outfit,
@@ -71,6 +73,7 @@ export async function POST(request: Request) {
       tips: parsed.tips,
       searchKeyword: effectiveSearchKeyword,
       images,
+      ...(shouldIncludePinterestDebug ? { pinterestDebug: pinterest.debug } : {}),
       result: JSON.stringify({
         outfit: parsed.outfit,
         items: parsed.items,
