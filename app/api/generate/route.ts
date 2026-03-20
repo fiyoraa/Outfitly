@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateOutfit, type OutfitInput } from "@/lib/claude";
+import { fetchPinterestImages } from "@/lib/pinterest";
 
 const hasValues = (value: unknown): value is string[] => {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
@@ -10,14 +11,6 @@ type OutfitResult = {
   items: string[];
   tips: string;
   searchKeyword: string;
-};
-
-type UnsplashResponse = {
-  results?: Array<{
-    urls?: {
-      regular?: string;
-    };
-  }>;
 };
 
 const parseOutfitJson = (raw: string): OutfitResult => {
@@ -36,36 +29,22 @@ const parseOutfitJson = (raw: string): OutfitResult => {
         ? parsed.items
         : [],
     tips: typeof parsed.tips === "string" ? parsed.tips : "",
-    searchKeyword: typeof parsed.searchKeyword === "string" ? parsed.searchKeyword : "outfit fashion",
+    searchKeyword: typeof parsed.searchKeyword === "string" ? parsed.searchKeyword : "",
   };
 };
 
-const fetchUnsplashImages = async (searchKeyword: string): Promise<string[]> => {
-  const accessKey = process.env.UNSPLASH_ACCESS_KEY;
+const resolveSearchKeyword = (parsed: OutfitResult, payload: OutfitInput): string => {
+  const fromGroq = parsed.searchKeyword.trim();
 
-  if (!accessKey) {
-    return [];
+  if (fromGroq) {
+    return fromGroq;
   }
 
-  const query = encodeURIComponent(searchKeyword);
-  const url = `https://api.unsplash.com/search/photos?query=${query}&per_page=4&orientation=portrait`;
+  const genderKeyword = payload.gender === "Laki-laki" ? "men" : "women";
 
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Client-ID ${accessKey}`,
-    },
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    return [];
-  }
-
-  const data = (await response.json()) as UnsplashResponse;
-
-  return (data.results || [])
-    .map((item) => item.urls?.regular)
-    .filter((imageUrl): imageUrl is string => Boolean(imageUrl));
+  return [payload.style[0], payload.occasion[0], payload.favoriteColor, "outfit", genderKeyword]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .join(" ");
 };
 
 export async function POST(request: Request) {
@@ -83,17 +62,20 @@ export async function POST(request: Request) {
 
     const result = await generateOutfit(payload);
     const parsed = parseOutfitJson(result);
-    const images = await fetchUnsplashImages(parsed.searchKeyword);
+    const effectiveSearchKeyword = resolveSearchKeyword(parsed, payload);
+    const images = await fetchPinterestImages(effectiveSearchKeyword);
 
     return NextResponse.json({
       outfit: parsed.outfit,
       items: parsed.items,
       tips: parsed.tips,
+      searchKeyword: effectiveSearchKeyword,
       images,
       result: JSON.stringify({
         outfit: parsed.outfit,
         items: parsed.items,
         tips: parsed.tips,
+        searchKeyword: effectiveSearchKeyword,
         images,
       }),
     });

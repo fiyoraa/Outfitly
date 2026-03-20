@@ -7,7 +7,7 @@ Outfitly adalah web app AI personal stylist untuk bantu pengguna memilih outfit 
 - AI Outfit Generator dengan input preferensi personal
 - Couple Mode (Dia dan Kamu) untuk outfit yang serasi
 - Gallery penyimpanan outfit (localStorage)
-- Unsplash image recommendation berdasarkan keyword outfit
+- Pinterest image recommendation berdasarkan keyword hasil Groq
 - UI premium clean estetik dengan Playfair Display + DM Sans
 - Terms of Service dan Privacy Policy
 
@@ -18,7 +18,7 @@ Outfitly adalah web app AI personal stylist untuk bantu pengguna memilih outfit 
 - TypeScript
 - Tailwind CSS
 - Groq API (LLM)
-- Unsplash API
+- Pinterest API
 
 ## Project Structure
 
@@ -50,7 +50,7 @@ cp .env.example .env.local
 Wajib diisi:
 
 - `GROQ_API_KEY`
-- `UNSPLASH_ACCESS_KEY`
+- `PINTEREST_ACCESS_TOKEN`
 
 Opsional (legacy):
 

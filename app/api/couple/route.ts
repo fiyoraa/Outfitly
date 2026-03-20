@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchPinterestImages } from "@/lib/pinterest";
 
 export const maxDuration = 60;
 
@@ -38,17 +39,8 @@ type CoupleResult = {
   person2: PersonResult;
 };
 
-type UnsplashResponse = {
-  results?: Array<{
-    urls?: {
-      regular?: string;
-    };
-  }>;
-};
-
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_TIMEOUT_MS = 20000;
-const UNSPLASH_TIMEOUT_MS = 8000;
 
 const hasValues = (value: unknown): value is string[] => {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
@@ -72,7 +64,7 @@ const parseCoupleJson = (raw: string): CoupleResult => {
         ? value.items
         : [],
     tips: typeof value?.tips === "string" ? value.tips : "",
-    searchKeyword: typeof value?.searchKeyword === "string" ? value.searchKeyword : "outfit fashion",
+    searchKeyword: typeof value?.searchKeyword === "string" ? value.searchKeyword : "",
   });
 
   return {
@@ -81,38 +73,18 @@ const parseCoupleJson = (raw: string): CoupleResult => {
   };
 };
 
-const fetchUnsplashImages = async (searchKeyword: string): Promise<string[]> => {
-  const accessKey = process.env.UNSPLASH_ACCESS_KEY;
+const resolvePersonKeyword = (person: PersonResult, fallback: PersonInput): string => {
+  const fromGroq = person.searchKeyword.trim();
 
-  if (!accessKey) {
-    return [];
+  if (fromGroq) {
+    return fromGroq;
   }
 
-  const query = encodeURIComponent(searchKeyword);
-  const url = `https://api.unsplash.com/search/photos?query=${query}&per_page=4&orientation=portrait`;
+  const genderKeyword = fallback.gender === "Laki-laki" ? "men" : "women";
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), UNSPLASH_TIMEOUT_MS);
-
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Client-ID ${accessKey}`,
-    },
-    cache: "no-store",
-    signal: controller.signal,
-  }).finally(() => {
-    clearTimeout(timeout);
-  });
-
-  if (!response.ok) {
-    return [];
-  }
-
-  const data = (await response.json()) as UnsplashResponse;
-
-  return (data.results || [])
-    .map((item) => item.urls?.regular)
-    .filter((imageUrl): imageUrl is string => Boolean(imageUrl));
+  return [fallback.style[0], fallback.occasion[0], "outfit", genderKeyword]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .join(" ");
 };
 
 export async function POST(request: Request) {
@@ -202,9 +174,11 @@ export async function POST(request: Request) {
     }
 
     const parsed = parseCoupleJson(resultText);
+    const person1Keyword = resolvePersonKeyword(parsed.person1, payload.person1);
+    const person2Keyword = resolvePersonKeyword(parsed.person2, payload.person2);
     const [images1, images2] = await Promise.all([
-      fetchUnsplashImages(parsed.person1.searchKeyword),
-      fetchUnsplashImages(parsed.person2.searchKeyword),
+      fetchPinterestImages(person1Keyword),
+      fetchPinterestImages(person2Keyword),
     ]);
 
     return NextResponse.json({
@@ -212,12 +186,14 @@ export async function POST(request: Request) {
         outfit: parsed.person1.outfit,
         items: parsed.person1.items,
         tips: parsed.person1.tips,
+        searchKeyword: person1Keyword,
         images: images1,
       },
       person2: {
         outfit: parsed.person2.outfit,
         items: parsed.person2.items,
         tips: parsed.person2.tips,
+        searchKeyword: person2Keyword,
         images: images2,
       },
     });
